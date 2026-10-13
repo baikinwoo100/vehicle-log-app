@@ -9,8 +9,9 @@ export default function DriverPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'write' | 'view'>('write');
   const [logs, setLogs] = useState<any[]>([]);
-  const [vehicles, setVehicles] = useState<any[]>([]); // DB에서 가져온 차량 목록 상태
-  const [selectedVehicleFilter, setSelectedVehicleFilter] = useState('전체'); // 조회 탭 필터 상태
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [selectedVehicleFilter, setSelectedVehicleFilter] = useState('전체');
+  const [selectedDetail, setSelectedDetail] = useState<any | null>(null); // 팝업창을 위한 상태
 
   const [formData, setFormData] = useState({
     vehicle: '',
@@ -27,12 +28,10 @@ export default function DriverPage() {
     signature: ''
   });
 
-  // 컴포넌트 로드 시 차량 목록 불러오기
   useEffect(() => {
     fetchVehicles();
   }, []);
 
-  // 조회 탭 누르거나 필터 변경 시 데이터 다시 불러오기
   useEffect(() => {
     if (activeTab === 'view') {
       fetchLogs();
@@ -44,7 +43,7 @@ export default function DriverPage() {
     if (!error && data) {
       setVehicles(data);
       if (data.length > 0) {
-        setFormData(prev => ({ ...prev, vehicle: data[0].plate })); // 폼 기본값을 첫 번째 차량으로
+        setFormData(prev => ({ ...prev, vehicle: data[0].plate }));
       }
     }
   };
@@ -101,7 +100,6 @@ export default function DriverPage() {
 
     alert('운행일지가 DB에 성공적으로 저장되었습니다.');
     
-    // 폼 초기화 (차량은 유지)
     setFormData(prev => ({
       ...prev,
       date: '', purpose: '', startTime: '', endTime: '', driveDist: '', accDist: '', 
@@ -112,7 +110,6 @@ export default function DriverPage() {
   };
 
   const handleDeleteLog = async (id: string, createdAt: string) => {
-    // 24시간 제한 검사
     const logTime = new Date(createdAt).getTime();
     const nowTime = new Date().getTime();
     const hoursDiff = (nowTime - logTime) / (1000 * 60 * 60);
@@ -146,11 +143,16 @@ export default function DriverPage() {
       { header: '운행목적지 및 내용', key: 'purpose', width: 25 },
       { header: '출발시간', key: 'start_time', width: 10 },
       { header: '도착시간', key: 'end_time', width: 10 },
-      { header: '운행거리', key: 'drive_dist', width: 10 },
-      { header: '누적거리', key: 'acc_dist', width: 10 },
-      { header: '운행자', key: 'signature', width: 15 },
+      { header: '운행거리(km)', key: 'drive_dist', width: 12 },
+      { header: '누적거리(km)', key: 'acc_dist', width: 12 },
+      { header: '주유/정비내역', key: 'maintenance', width: 30 },
+      { header: '운행자(서명)', key: 'signature', width: 15 },
     ];
     logs.forEach(log => {
+      const maintenance = [];
+      if (log.gas_liter || log.gas_price) maintenance.push(`주유: ${log.gas_liter || 0}L (${log.gas_price?.toLocaleString() || 0}원)`);
+      if (log.repair_detail || log.repair_price) maintenance.push(`정비: ${log.repair_detail || '-'} (${log.repair_price?.toLocaleString() || 0}원)`);
+
       sheet.addRow({
         date: log.date,
         vehicle_plate: log.vehicle_plate,
@@ -159,6 +161,7 @@ export default function DriverPage() {
         end_time: log.end_time?.slice(0, 5) || '',
         drive_dist: log.drive_dist,
         acc_dist: log.acc_dist,
+        maintenance: maintenance.join(' / ') || '-',
         signature: log.signature
       });
     });
@@ -174,7 +177,7 @@ export default function DriverPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 text-black">
-      <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
+      <div className="max-w-5xl mx-auto bg-white p-6 rounded-lg shadow-md">
         
         <div className="flex border-b mb-6 text-center">
           <button
@@ -298,22 +301,21 @@ export default function DriverPage() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[800px]">
+              <table className="w-full text-left border-collapse min-w-[900px]">
                 <thead>
                   <tr className="bg-gray-200 border-b">
                     <th className="p-3">일자</th>
                     <th className="p-3">차량</th>
                     <th className="p-3">목적</th>
                     <th className="p-3">시간</th>
-                    <th className="p-3">운행거리</th>
-                    <th className="p-3">누적거리</th>
+                    <th className="p-3">운행/누적거리</th>
+                    <th className="p-3 text-center">주유/정비</th>
                     <th className="p-3">운행자</th>
                     <th className="p-3 text-center">관리 (24시간)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {logs.map((log) => {
-                    // 삭제 가능 여부 계산 (24시간)
                     const logTime = new Date(log.created_at).getTime();
                     const nowTime = new Date().getTime();
                     const isDeletable = (nowTime - logTime) / (1000 * 60 * 60) <= 24;
@@ -324,8 +326,19 @@ export default function DriverPage() {
                         <td className="p-3 whitespace-nowrap">{log.vehicle_plate}</td>
                         <td className="p-3">{log.purpose}</td>
                         <td className="p-3 whitespace-nowrap">{log.start_time.slice(0,5)} ~ {log.end_time.slice(0,5)}</td>
-                        <td className="p-3">{log.drive_dist}km</td>
-                        <td className="p-3">{log.acc_dist}km</td>
+                        <td className="p-3 whitespace-nowrap">{log.drive_dist}km / {log.acc_dist}km</td>
+                        <td className="p-3 text-center">
+                          {(log.gas_liter || log.repair_detail) ? (
+                            <button 
+                              onClick={() => setSelectedDetail(log)}
+                              className="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs hover:bg-gray-300 transition font-medium"
+                            >
+                              {log.gas_liter ? '⛽ ' : ''}{log.repair_detail ? '🔧 ' : ''} 상세
+                            </button>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
                         <td className="p-3">{log.signature}</td>
                         <td className="p-3 text-center">
                           {isDeletable ? (
@@ -360,6 +373,37 @@ export default function DriverPage() {
           로그아웃 (메인 화면으로)
         </button>
       </div>
+
+      {/* 팝업 모달창 */}
+      {selectedDetail && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+            <h3 className="text-lg font-bold mb-4 border-b pb-2">주유 및 정비 상세내역</h3>
+            <div className="space-y-4 text-sm">
+              {selectedDetail.gas_liter && (
+                <div className="bg-blue-50 p-4 rounded-md border border-blue-100">
+                  <p className="font-semibold text-blue-800 flex items-center gap-2 mb-2">⛽ 주유 내역</p>
+                  <p className="text-gray-700">주유량: <span className="font-medium">{selectedDetail.gas_liter} L</span></p>
+                  <p className="text-gray-700">금액: <span className="font-medium">{selectedDetail.gas_price ? selectedDetail.gas_price.toLocaleString() + ' 원' : '-'}</span></p>
+                </div>
+              )}
+              {selectedDetail.repair_detail && (
+                <div className="bg-orange-50 p-4 rounded-md border border-orange-100">
+                  <p className="font-semibold text-orange-800 flex items-center gap-2 mb-2">🔧 정비 내역</p>
+                  <p className="text-gray-700">내역: <span className="font-medium">{selectedDetail.repair_detail}</span></p>
+                  <p className="text-gray-700">금액: <span className="font-medium">{selectedDetail.repair_price ? selectedDetail.repair_price.toLocaleString() + ' 원' : '-'}</span></p>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setSelectedDetail(null)}
+              className="mt-6 w-full bg-gray-800 text-white py-2 rounded-md hover:bg-gray-900 transition font-semibold"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

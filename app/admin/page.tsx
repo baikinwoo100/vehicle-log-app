@@ -12,6 +12,7 @@ export default function AdminPage() {
   const [endDate, setEndDate] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState('전체');
   const [logs, setLogs] = useState<any[]>([]);
+  const [selectedDetail, setSelectedDetail] = useState<any | null>(null); // 팝업창을 위한 상태
 
   useEffect(() => {
     fetchVehicles();
@@ -107,8 +108,8 @@ export default function AdminPage() {
 
     logs.forEach(log => {
       const maintenance = [];
-      if (log.gas_liter || log.gas_price) maintenance.push(`주유: ${log.gas_liter || 0}L (${log.gas_price || 0}원)`);
-      if (log.repair_detail || log.repair_price) maintenance.push(`정비: ${log.repair_detail || '-'} (${log.repair_price || 0}원)`);
+      if (log.gas_liter || log.gas_price) maintenance.push(`주유: ${log.gas_liter || 0}L (${log.gas_price?.toLocaleString() || 0}원)`);
+      if (log.repair_detail || log.repair_price) maintenance.push(`정비: ${log.repair_detail || '-'} (${log.repair_price?.toLocaleString() || 0}원)`);
 
       sheet.addRow({
         date: log.date,
@@ -216,7 +217,7 @@ export default function AdminPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px]">
+            <table className="w-full text-left border-collapse min-w-[900px]">
               <thead>
                 <tr className="bg-gray-100 border-b">
                   <th className="p-3">일자</th>
@@ -224,7 +225,7 @@ export default function AdminPage() {
                   <th className="p-3">목적지 및 내용</th>
                   <th className="p-3">시간</th>
                   <th className="p-3">운행/누적거리</th>
-                  <th className="p-3">주유 및 정비</th>
+                  <th className="p-3 text-center">주유/정비</th>
                   <th className="p-3">운행자</th>
                   <th className="p-3 text-center">관리</th>
                 </tr>
@@ -237,11 +238,17 @@ export default function AdminPage() {
                     <td className="p-3">{log.purpose}</td>
                     <td className="p-3 whitespace-nowrap">{log.start_time?.slice(0,5)} ~ {log.end_time?.slice(0,5)}</td>
                     <td className="p-3 whitespace-nowrap">{log.drive_dist}km / {log.acc_dist}km</td>
-                    <td className="p-3 text-xs text-gray-600">
-                      {log.gas_liter ? `주유: ${log.gas_liter}L (${log.gas_price}원)` : ''} 
-                      {log.gas_liter && log.repair_detail ? ' | ' : ''}
-                      {log.repair_detail ? `정비: ${log.repair_detail} (${log.repair_price}원)` : ''}
-                      {!log.gas_liter && !log.repair_detail ? '-' : ''}
+                    <td className="p-3 text-center">
+                      {(log.gas_liter || log.repair_detail) ? (
+                        <button 
+                          onClick={() => setSelectedDetail(log)}
+                          className="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs hover:bg-gray-300 transition font-medium"
+                        >
+                          {log.gas_liter ? '⛽ ' : ''}{log.repair_detail ? '🔧 ' : ''} 상세
+                        </button>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
                     </td>
                     <td className="p-3">{log.signature}</td>
                     <td className="p-3 text-center">
@@ -265,6 +272,37 @@ export default function AdminPage() {
         </div>
 
       </div>
+
+      {/* 팝업 모달창 */}
+      {selectedDetail && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full">
+            <h3 className="text-lg font-bold mb-4 border-b pb-2">주유 및 정비 상세내역</h3>
+            <div className="space-y-4 text-sm">
+              {selectedDetail.gas_liter && (
+                <div className="bg-blue-50 p-4 rounded-md border border-blue-100">
+                  <p className="font-semibold text-blue-800 flex items-center gap-2 mb-2">⛽ 주유 내역</p>
+                  <p className="text-gray-700">주유량: <span className="font-medium">{selectedDetail.gas_liter} L</span></p>
+                  <p className="text-gray-700">금액: <span className="font-medium">{selectedDetail.gas_price ? selectedDetail.gas_price.toLocaleString() + ' 원' : '-'}</span></p>
+                </div>
+              )}
+              {selectedDetail.repair_detail && (
+                <div className="bg-orange-50 p-4 rounded-md border border-orange-100">
+                  <p className="font-semibold text-orange-800 flex items-center gap-2 mb-2">🔧 정비 내역</p>
+                  <p className="text-gray-700">내역: <span className="font-medium">{selectedDetail.repair_detail}</span></p>
+                  <p className="text-gray-700">금액: <span className="font-medium">{selectedDetail.repair_price ? selectedDetail.repair_price.toLocaleString() + ' 원' : '-'}</span></p>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setSelectedDetail(null)}
+              className="mt-6 w-full bg-gray-800 text-white py-2 rounded-md hover:bg-gray-900 transition font-semibold"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
