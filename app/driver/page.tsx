@@ -11,7 +11,7 @@ export default function DriverPage() {
   const [logs, setLogs] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [selectedVehicleFilter, setSelectedVehicleFilter] = useState('전체');
-  const [selectedDetail, setSelectedDetail] = useState<any | null>(null); // 팝업창을 위한 상태
+  const [selectedDetail, setSelectedDetail] = useState<any | null>(null);
 
   const [formData, setFormData] = useState({
     vehicle: '',
@@ -71,6 +71,48 @@ export default function DriverPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // 운행거리 자동 계산 함수
+  const handleCalculateDist = async () => {
+    if (!formData.vehicle) {
+      alert('차량을 먼저 선택해주세요.');
+      return;
+    }
+    if (!formData.accDist) {
+      alert('현재 누적거리를 먼저 입력해주세요.');
+      return;
+    }
+
+    // DB에서 해당 차량의 가장 최근 기록 조회
+    const { data, error } = await supabase
+      .from('logs')
+      .select('acc_dist')
+      .eq('vehicle_plate', formData.vehicle)
+      .order('date', { ascending: false })
+      .order('start_time', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      alert('이전 기록을 불러오는 데 실패했습니다.');
+      return;
+    }
+
+    if (data && data.length > 0) {
+      const prevAcc = data[0].acc_dist;
+      const currentAcc = Number(formData.accDist);
+      const diff = currentAcc - prevAcc;
+
+      if (diff < 0) {
+        alert(`입력하신 누적거리(${currentAcc}km)가 이전 기록(${prevAcc}km)보다 작습니다. 확인해주세요.`);
+      } else {
+        // 소수점 1자리까지 표시 후 문자열로 변환 (필요없는 0 제거를 위해 parseFloat 사용)
+        const calculatedDist = parseFloat(diff.toFixed(1)).toString();
+        setFormData(prev => ({ ...prev, driveDist: calculatedDist }));
+      }
+    } else {
+      alert('해당 차량의 이전 운행 기록이 없어 자동 계산을 할 수 없습니다. 최초 1회는 직접 입력해주세요.');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -235,10 +277,19 @@ export default function DriverPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">운행거리(km)</label>
-                <input type="number" step="0.1" name="driveDist" value={formData.driveDist} onChange={handleChange} required className="w-full mt-1 border p-2 rounded-md" />
+                <input type="number" step="0.1" name="driveDist" value={formData.driveDist} onChange={handleChange} required placeholder="직접 입력 또는 자동 계산" className="w-full mt-1 border p-2 rounded-md bg-blue-50" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">누적거리(km)</label>
+                <div className="flex justify-between items-center">
+                  <label className="block text-sm font-medium text-gray-700">누적거리(km)</label>
+                  <button 
+                    type="button" 
+                    onClick={handleCalculateDist}
+                    className="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2 py-1 rounded hover:bg-indigo-200 transition"
+                  >
+                    운행거리 자동계산
+                  </button>
+                </div>
                 <input type="number" step="0.1" name="accDist" value={formData.accDist} onChange={handleChange} required className="w-full mt-1 border p-2 rounded-md" />
               </div>
             </div>
