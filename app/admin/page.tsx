@@ -10,6 +10,7 @@ export default function AdminPage() {
   
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [selectedVehicle, setSelectedVehicle] = useState('전체');
   const [logs, setLogs] = useState<any[]>([]);
 
   useEffect(() => {
@@ -42,11 +43,23 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteVehicle = async (id: string) => {
+    if (window.confirm('정말 이 차량을 삭제하시겠습니까? 관련 운행일지는 삭제되지 않습니다.')) {
+      const { error } = await supabase.from('vehicles').delete().eq('id', id);
+      if (error) {
+        alert('차량 삭제 실패: ' + error.message);
+      } else {
+        fetchVehicles();
+      }
+    }
+  };
+
   const fetchLogs = async () => {
     let query = supabase.from('logs').select('*').order('date', { ascending: false }).order('start_time', { ascending: false });
     
     if (startDate) query = query.gte('date', startDate);
     if (endDate) query = query.lte('date', endDate);
+    if (selectedVehicle !== '전체') query = query.eq('vehicle_plate', selectedVehicle);
 
     const { data, error } = await query;
     if (error) {
@@ -58,6 +71,17 @@ export default function AdminPage() {
 
   const handleSearch = () => {
     fetchLogs();
+  };
+
+  const handleDeleteLog = async (id: string) => {
+    if (window.confirm('이 운행기록을 정말 삭제하시겠습니까? (관리자 권한)')) {
+      const { error } = await supabase.from('logs').delete().eq('id', id);
+      if (error) {
+        alert('운행기록 삭제 실패: ' + error.message);
+      } else {
+        fetchLogs();
+      }
+    }
   };
 
   const handleExportExcel = async () => {
@@ -135,32 +159,50 @@ export default function AdminPage() {
           </div>
 
           <div className="bg-white p-6 rounded-lg shadow-md">
-            <h2 className="text-xl font-semibold mb-4">등록된 차량 상태 관리</h2>
+            <h2 className="text-xl font-semibold mb-4">등록된 차량 관리 (수정/삭제)</h2>
             <div className="space-y-4 max-h-48 overflow-y-auto pr-2">
               {vehicles.map(vehicle => (
                 <div key={vehicle.id} className="flex items-center justify-between border-b pb-2 last:border-0">
                   <span className="font-medium">{vehicle.plate}</span>
-                  <select 
-                    className="border border-gray-300 px-3 py-1 rounded-md bg-white text-sm focus:outline-none"
-                    value={vehicle.status}
-                    onChange={(e) => handleStatusChange(vehicle.id, e.target.value)}
-                  >
-                    <option value="정상">✅ 정상 운행</option>
-                    <option value="외부 대절">🚌 외부 대절</option>
-                    <option value="수리 중">🔧 수리 중</option>
-                    <option value="사용 금지">🚫 사용 금지</option>
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <select 
+                      className="border border-gray-300 px-3 py-1 rounded-md bg-white text-sm focus:outline-none"
+                      value={vehicle.status}
+                      onChange={(e) => handleStatusChange(vehicle.id, e.target.value)}
+                    >
+                      <option value="정상">✅ 정상 운행</option>
+                      <option value="외부 대절">🚌 외부 대절</option>
+                      <option value="수리 중">🔧 수리 중</option>
+                      <option value="사용 금지">🚫 사용 금지</option>
+                    </select>
+                    <button 
+                      onClick={() => handleDeleteVehicle(vehicle.id)}
+                      className="bg-red-500 text-white px-3 py-1 rounded-md text-sm hover:bg-red-600 transition"
+                    >
+                      삭제
+                    </button>
+                  </div>
                 </div>
               ))}
-              {vehicles.length === 0 && <p className="text-gray-500 text-sm">차량이 없습니다.</p>}
+              {vehicles.length === 0 && <p className="text-gray-500 text-sm">등록된 차량이 없습니다.</p>}
             </div>
           </div>
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow-md">
           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-            <h2 className="text-xl font-semibold">운행 일지 조회 및 엑셀 다운로드</h2>
-            <div className="flex gap-2 items-center">
+            <h2 className="text-xl font-semibold">운행 일지 조회 및 관리</h2>
+            <div className="flex flex-wrap gap-2 items-center">
+              <select 
+                value={selectedVehicle} 
+                onChange={(e) => setSelectedVehicle(e.target.value)} 
+                className="border p-2 rounded-md text-sm"
+              >
+                <option value="전체">모든 차량</option>
+                {vehicles.map(v => (
+                  <option key={v.id} value={v.plate}>{v.plate}</option>
+                ))}
+              </select>
               <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="border p-2 rounded-md text-sm" />
               <span>~</span>
               <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="border p-2 rounded-md text-sm" />
@@ -184,6 +226,7 @@ export default function AdminPage() {
                   <th className="p-3">운행/누적거리</th>
                   <th className="p-3">주유 및 정비</th>
                   <th className="p-3">운행자</th>
+                  <th className="p-3 text-center">관리</th>
                 </tr>
               </thead>
               <tbody>
@@ -201,11 +244,19 @@ export default function AdminPage() {
                       {!log.gas_liter && !log.repair_detail ? '-' : ''}
                     </td>
                     <td className="p-3">{log.signature}</td>
+                    <td className="p-3 text-center">
+                      <button 
+                        onClick={() => handleDeleteLog(log.id)}
+                        className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 transition"
+                      >
+                        삭제
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {logs.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="text-center p-6 text-gray-500">해당 기간의 기록이 없습니다.</td>
+                    <td colSpan={8} className="text-center p-6 text-gray-500">조회된 기록이 없습니다.</td>
                   </tr>
                 )}
               </tbody>
