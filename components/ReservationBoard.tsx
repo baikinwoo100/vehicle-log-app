@@ -3,10 +3,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 
 export default function ReservationBoard({ vehicles }: { vehicles: any[] }) {
-  // 오늘 날짜를 YYYY-MM-DD 형태로 가져옴
-  const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace('.', '');
-  
-  const [selectedDate, setSelectedDate] = useState(today);
+  // 초기값을 빈 문자열로 설정하여 서버 렌더링 에러 방지
+  const [selectedDate, setSelectedDate] = useState('');
   const [reservations, setReservations] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   
@@ -17,6 +15,15 @@ export default function ReservationBoard({ vehicles }: { vehicles: any[] }) {
     reserverName: ''
   });
 
+  // 컴포넌트가 브라우저에 마운트된 후(클라이언트 측) 오늘 날짜 계산
+  useEffect(() => {
+    const todayStr = new Date().toLocaleDateString('ko-KR', { 
+      year: 'numeric', month: '2-digit', day: '2-digit' 
+    }).replace(/\. /g, '-').replace('.', '');
+    
+    setSelectedDate(todayStr);
+  }, []);
+
   useEffect(() => {
     if (vehicles.length > 0 && !resForm.vehicle) {
       setResForm(prev => ({ ...prev, vehicle: vehicles[0].plate }));
@@ -24,7 +31,9 @@ export default function ReservationBoard({ vehicles }: { vehicles: any[] }) {
   }, [vehicles]);
 
   useEffect(() => {
-    fetchReservations();
+    if (selectedDate) {
+      fetchReservations();
+    }
   }, [selectedDate]);
 
   const fetchReservations = async () => {
@@ -65,6 +74,9 @@ export default function ReservationBoard({ vehicles }: { vehicles: any[] }) {
       if (!error) fetchReservations();
     }
   };
+
+  // 날짜가 계산되기 전에는 빈 화면 렌더링 (깜빡임 방지)
+  if (!selectedDate) return null;
 
   return (
     <div className="space-y-6 mt-4">
