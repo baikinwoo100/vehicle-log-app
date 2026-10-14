@@ -119,10 +119,13 @@ export default function ReservationBoard({ vehicles }: { vehicles: any[] }) {
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {vReservations.map(r => (
-                    <div key={r.id} className="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-2 rounded-md text-sm flex items-center gap-2 shadow-sm">
+                    <div key={r.id} className="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-2 rounded-md text-sm flex flex-col sm:flex-row items-start sm:items-center gap-2 shadow-sm">
                       <span className="font-bold">{r.start_time.slice(0,5)} ~ {r.end_time.slice(0,5)}</span>
                       <span className="text-gray-700 bg-white px-2 rounded-full border border-blue-100">{r.reserver_name}</span>
-                      <button onClick={() => handleDelete(r.id)} className="ml-1 text-red-400 hover:text-red-600 font-bold text-lg leading-none" title="예약 취소">×</button>
+                      <span className="text-xs text-gray-500 font-medium">
+                        (예약 시간: {new Date(r.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })})
+                      </span>
+                      <button onClick={() => handleDelete(r.id)} className="ml-auto text-red-400 hover:text-red-600 font-bold text-lg leading-none px-2" title="예약 취소">×</button>
                     </div>
                   ))}
                 </div>
