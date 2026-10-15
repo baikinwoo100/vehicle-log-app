@@ -13,6 +13,12 @@ export default function DriverPage() {
 
   useEffect(() => {
     fetchVehicles();
+    
+    // 🚨 [추가] 주소창에 차량 번호가 있으면 자동으로 '일지 작성' 탭을 먼저 띄워줌
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('vehicle')) {
+      setActiveTab('write');
+    }
   }, []);
 
   const fetchVehicles = async () => {
