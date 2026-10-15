@@ -22,8 +22,14 @@ export default function ReservationBoard({ vehicles }: { vehicles: any[] }) {
     setSelectedDate(todayStr);
   }, []);
 
+  // 🚨 [핵심 기능] QR코드로 접속 시 주소창에서 차량 번호를 읽어와서 자동 선택함
   useEffect(() => {
-    if (vehicles.length > 0 && !resForm.vehicle) {
+    const params = new URLSearchParams(window.location.search);
+    const qVehicle = params.get('vehicle');
+    
+    if (qVehicle && vehicles.some(v => v.plate === qVehicle)) {
+      setResForm(prev => ({ ...prev, vehicle: qVehicle }));
+    } else if (vehicles.length > 0 && !resForm.vehicle) {
       setResForm(prev => ({ ...prev, vehicle: vehicles[0].plate }));
     }
   }, [vehicles]);
@@ -44,10 +50,9 @@ export default function ReservationBoard({ vehicles }: { vehicles: any[] }) {
   const handleAddReservation = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 🚨 [핵심 기능] 시간 중복 검사 로직 (중복 예약 금지)
+    // 🚨 [핵심 기능] 시간 중복 검사 로직 (기존 예약과 시간이 겹치면 차단)
     const isOverlap = reservations.some(r => {
       if (r.vehicle_plate === resForm.vehicle) {
-        // 기존 예약과 시간이 겹치는지 확인 (새 시작이 기존 종료보다 빠르고, 새 종료가 기존 시작보다 늦음)
         return resForm.startTime < r.end_time && resForm.endTime > r.start_time;
       }
       return false;

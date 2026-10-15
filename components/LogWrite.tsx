@@ -9,16 +9,20 @@ export default function LogWrite({ vehicles, onSaved }: { vehicles: any[], onSav
     gasLiter: '', gasPrice: '', repairDetail: '', repairPrice: '', signature: ''
   });
 
-  // 🚨 [핵심] 차량별 직전 누적거리 상태 저장
   const [prevRecord, setPrevRecord] = useState<{ acc_dist: number } | null>(null);
 
+  // 🚨 [핵심 기능] QR코드로 접속 시 주소창에서 차량 번호를 읽어와서 자동 선택함
   useEffect(() => {
-    if (vehicles.length > 0 && !formData.vehicle) {
+    const params = new URLSearchParams(window.location.search);
+    const qVehicle = params.get('vehicle');
+    
+    if (qVehicle && vehicles.some(v => v.plate === qVehicle)) {
+      setFormData(prev => ({ ...prev, vehicle: qVehicle }));
+    } else if (vehicles.length > 0 && !formData.vehicle) {
       setFormData(prev => ({ ...prev, vehicle: vehicles[0].plate }));
     }
   }, [vehicles]);
 
-  // 🚨 [추가] 차량을 선택할 때마다 DB에서 직전 누적거리 미리 불러오기 (실시간 검증용)
   useEffect(() => {
     const fetchPrevRecord = async () => {
       if (!formData.vehicle) return;
@@ -63,17 +67,31 @@ export default function LogWrite({ vehicles, onSaved }: { vehicles: any[], onSav
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // 🚨 [핵심 기능] 운행일지 시간 중복 검사 로직 (동일 날짜, 동일 차량에 겹치는 시간이 있는지 확인)
+    const { data: overlappingLogs, error: overlapError } = await supabase
+      .from('logs')
+      .select('*')
+      .eq('vehicle_plate', formData.vehicle)
+      .eq('date', formData.date);
+
+    if (!overlapError && overlappingLogs) {
+      const isTimeOverlap = overlappingLogs.some(log => {
+         return formData.startTime < log.end_time && formData.endTime > log.start_time;
+      });
+      if (isTimeOverlap) {
+        return alert('🚨 시간 중복 오류: 해당 차량은 같은 날짜/시간대에 이미 작성된 운행일지가 있습니다.\n시간을 다시 확인해 주세요.');
+      }
+    }
+
     if (prevRecord && formData.accDist) {
       const prevAcc = prevRecord.acc_dist;
       const currentAcc = Number(formData.accDist);
       const currentDrive = Number(formData.driveDist);
 
-      // 1) 누적거리가 과거 기록보다 적으면 완전 차단
       if (currentAcc < prevAcc) {
         return alert(`🚨 기입 오류: 누적거리(${currentAcc}km)가 직전 누적거리(${prevAcc}km)보다 작을 수 없습니다!\n계기판을 다시 확인해 주세요.`);
       }
 
-      // 2) 계산된 주행거리와 입력 주행거리가 다르면 경고창 띄우고 선택권 줌
       if (formData.driveDist) {
         const expectedDrive = parseFloat((currentAcc - prevAcc).toFixed(1));
         if (currentDrive !== expectedDrive) {
@@ -101,7 +119,6 @@ export default function LogWrite({ vehicles, onSaved }: { vehicles: any[], onSav
     onSaved();
   };
 
-  // 🚨 [추가] 실시간 계산 및 에러 검출 로직
   let distanceErrorMsg = '';
   let isDistanceError = false;
 
@@ -122,7 +139,6 @@ export default function LogWrite({ vehicles, onSaved }: { vehicles: any[], onSav
     }
   }
 
-  // 공통 및 에러 시 인풋 스타일 지정
   const defaultInputStyle = "w-full border-2 border-gray-200 p-2.5 rounded-xl text-sm font-bold bg-gray-50 focus:bg-white focus:border-blue-500 outline-none transition-colors";
   const errorInputStyle = "w-full border-2 border-red-500 p-2.5 rounded-xl text-sm font-bold bg-red-50 text-red-700 focus:bg-white focus:border-red-600 outline-none transition-colors cursor-help";
 
@@ -160,7 +176,6 @@ export default function LogWrite({ vehicles, onSaved }: { vehicles: any[], onSav
         </div>
       </div>
       
-      {/* 🚨 [핵심] 이동거리 & 누적거리 입력부 (에러 하이라이트 적용) */}
       <div className="grid grid-cols-2 gap-4">
         <div className="relative group">
           <label className="block text-sm font-bold text-gray-700 mb-1">운행거리(km)</label>
@@ -185,7 +200,6 @@ export default function LogWrite({ vehicles, onSaved }: { vehicles: any[], onSav
         </div>
       </div>
       
-      {/* 🚨 [추가] 모바일에서도 잘 보이게 인풋 바로 아래에 붉은색 경고 문구 표시 */}
       {isDistanceError && (
         <div className="bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-lg text-xs font-bold animate-pulse">
           ⚠️ {distanceErrorMsg}
