@@ -59,15 +59,9 @@ export default function LogWrite({ vehicles, onSaved }: { vehicles: any[], onSav
     const endHours = String(now.getHours()).padStart(2, '0');
     const endMinutes = String(now.getMinutes()).padStart(2, '0');
     
-    // 출발 시간: 1시간 전으로 세팅
-    const past = new Date(now.getTime() - 60 * 60 * 1000);
-    const startHours = String(past.getHours()).padStart(2, '0');
-    const startMinutes = String(past.getMinutes()).padStart(2, '0');
-
     setFormData(prev => ({
       ...prev,
       date: dateStr,
-      startTime: `${startHours}:${startMinutes}`,
       endTime: `${endHours}:${endMinutes}`
     }));
   };
