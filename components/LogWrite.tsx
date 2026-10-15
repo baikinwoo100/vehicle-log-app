@@ -11,6 +11,7 @@ export default function LogWrite({ vehicles, onSaved }: { vehicles: any[], onSav
 
   const [prevRecord, setPrevRecord] = useState<{ acc_dist: number } | null>(null);
 
+  // 🚨 [핵심 기능] QR코드로 접속 시 주소창에서 차량 번호를 읽어와서 자동 선택함
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const qVehicle = params.get('vehicle');
@@ -45,6 +46,32 @@ export default function LogWrite({ vehicles, onSaved }: { vehicles: any[], onSav
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // 🚨 [추가 기능] 오늘 날짜 및 현재 시간 자동 입력 로직
+  const handleSetCurrentDateTime = () => {
+    const now = new Date();
+    
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    // 도착 시간: 현재 시간
+    const endHours = String(now.getHours()).padStart(2, '0');
+    const endMinutes = String(now.getMinutes()).padStart(2, '0');
+    
+    // 출발 시간: 1시간 전으로 세팅
+    const past = new Date(now.getTime() - 60 * 60 * 1000);
+    const startHours = String(past.getHours()).padStart(2, '0');
+    const startMinutes = String(past.getMinutes()).padStart(2, '0');
+
+    setFormData(prev => ({
+      ...prev,
+      date: dateStr,
+      startTime: `${startHours}:${startMinutes}`,
+      endTime: `${endHours}:${endMinutes}`
+    }));
+  };
+
   const handleCalculateDist = () => {
     if (!formData.vehicle) return alert('차량을 먼저 선택해주세요.');
     if (!formData.accDist) return alert('현재 누적거리를 먼저 입력해주세요.');
@@ -66,7 +93,6 @@ export default function LogWrite({ vehicles, onSaved }: { vehicles: any[], onSav
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 🚨 [추가] 역시간 입력 방지 로직
     if (formData.startTime >= formData.endTime) {
       return alert('🚨 시간 입력 오류: 도착 시간이 출발 시간보다 빠르거나 같을 수 없습니다.\n시간을 다시 확인해 주세요.');
     }
@@ -160,7 +186,13 @@ export default function LogWrite({ vehicles, onSaved }: { vehicles: any[], onSav
           )}
         </div>
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-1">일자</label>
+          <div className="flex justify-between items-center mb-1">
+            <label className="block text-sm font-bold text-gray-700">일자</label>
+            {/* 🚨 [추가] 오늘 날짜/시간 자동 입력 버튼 */}
+            <button type="button" onClick={handleSetCurrentDateTime} className="text-xs bg-green-100 text-green-700 font-extrabold px-2.5 py-1 rounded-lg hover:bg-green-200 transition-colors shadow-sm">
+              오늘 날짜/시간 입력
+            </button>
+          </div>
           <input type="date" name="date" value={formData.date} onChange={handleChange} required className={defaultInputStyle} />
         </div>
       </div>
