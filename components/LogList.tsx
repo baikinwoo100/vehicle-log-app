@@ -45,13 +45,9 @@ export default function LogList({ vehicles }: { vehicles: any[] }) {
       const maint = [];
       let efficiency = '-';
       
-      // 🚨 [핵심 기능] 엑셀 다운로드 시 '진짜 구간 연비' 계산 로직
       if (l.gas_liter) {
         maint.push(`주유: ${l.gas_liter}L (${l.gas_price?.toLocaleString() || 0}원)`);
-        
-        // logs 배열은 최신순 정렬이므로, 다음 인덱스들이 '과거' 기록들임
         const prevFuelLog = logs.slice(idx + 1).find(x => x.vehicle_plate === l.vehicle_plate && x.gas_liter > 0);
-        
         if (prevFuelLog) {
           const distDiff = l.acc_dist - prevFuelLog.acc_dist;
           efficiency = distDiff > 0 ? `${(distDiff / l.gas_liter).toFixed(1)} km/L` : '오류(거리증가없음)';
@@ -77,10 +73,8 @@ export default function LogList({ vehicles }: { vehicles: any[] }) {
     const a = document.createElement('a'); a.href = url; a.download = `차량운행일지.xlsx`; a.click();
   };
 
-  // 모달창 연비 표시를 위한 계산 함수
   const getEfficiencyData = (detail: any) => {
     if (!detail || !detail.gas_liter) return null;
-    
     const idx = logs.findIndex(x => x.id === detail.id);
     const prevFuelLog = logs.slice(idx + 1).find(x => x.vehicle_plate === detail.vehicle_plate && x.gas_liter > 0);
     
@@ -119,13 +113,39 @@ export default function LogList({ vehicles }: { vehicles: any[] }) {
             </tr>
           </thead>
           <tbody>
-            {logs.map(log => {
+            {logs.map((log, idx) => {
               const isDeletable = (new Date().getTime() - new Date(log.created_at).getTime()) / 3600000 <= 24;
+              
+              // 🚨 [핵심] 리스트 렌더링 시 계산 오류가 있는지 실시간으로 검사
+              const prevLog = logs.slice(idx + 1).find(x => x.vehicle_plate === log.vehicle_plate);
+              let isCalcError = false;
+              let expectedDist = 0;
+
+              if (prevLog) {
+                expectedDist = parseFloat((log.acc_dist - prevLog.acc_dist).toFixed(1));
+                if (log.drive_dist !== expectedDist) {
+                  isCalcError = true;
+                }
+              }
+
               return (
-                <tr key={log.id} className="border-b last:border-0 hover:bg-blue-50/50 transition-colors text-sm">
-                  <td className="p-4 font-bold text-gray-900">{log.date}</td><td className="p-4 font-bold text-gray-900">{log.vehicle_plate}</td><td className="p-4 text-gray-700">{log.purpose}</td>
+                <tr key={log.id} className={`border-b last:border-0 transition-colors text-sm ${isCalcError ? 'bg-red-50/50 hover:bg-red-100' : 'hover:bg-blue-50/50'}`}>
+                  <td className="p-4 font-bold text-gray-900">{log.date}</td>
+                  <td className="p-4 font-bold text-gray-900">{log.vehicle_plate}</td>
+                  <td className="p-4 text-gray-700">{log.purpose}</td>
                   <td className="p-4 text-gray-700">{log.start_time.slice(0,5)}~{log.end_time.slice(0,5)}</td>
-                  <td className="p-4 text-gray-700"><span className="text-blue-600 font-bold">{log.drive_dist}</span> / {log.acc_dist}</td>
+                  
+                  <td className="p-4 text-gray-700">
+                    {/* 🚨 [추가] 계산이 틀린 행은 빨간색으로 하이라이트하고 마우스 올리면 원인 툴팁 표시 */}
+                    {isCalcError ? (
+                      <div className="inline-flex items-center gap-1 text-red-600 font-extrabold cursor-help bg-red-100 px-2 py-1 rounded-lg border border-red-200" title={`🚨 계산 오류!\n이전 누적거리(${prevLog?.acc_dist})를 기준으로 하면\n올바른 운행거리는 [ ${expectedDist}km ] 입니다.`}>
+                        ⚠️ <span>{log.drive_dist}</span> / {log.acc_dist}
+                      </div>
+                    ) : (
+                      <><span className="text-blue-600 font-bold">{log.drive_dist}</span> / {log.acc_dist}</>
+                    )}
+                  </td>
+                  
                   <td className="p-4 text-center">
                     {(log.gas_liter || log.repair_detail) ? (
                       <button onClick={() => setSelectedDetail(log)} className="bg-white border-2 border-gray-200 px-3 py-1.5 rounded-full text-xs font-bold text-gray-700 shadow-sm hover:border-blue-400 hover:text-blue-600 transition-colors">

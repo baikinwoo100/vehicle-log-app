@@ -11,7 +11,6 @@ export default function LogWrite({ vehicles, onSaved }: { vehicles: any[], onSav
 
   const [prevRecord, setPrevRecord] = useState<{ acc_dist: number } | null>(null);
 
-  // 🚨 [핵심 기능] QR코드로 접속 시 주소창에서 차량 번호를 읽어와서 자동 선택함
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const qVehicle = params.get('vehicle');
@@ -67,7 +66,11 @@ export default function LogWrite({ vehicles, onSaved }: { vehicles: any[], onSav
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 🚨 [핵심 기능] 운행일지 시간 중복 검사 로직 (동일 날짜, 동일 차량에 겹치는 시간이 있는지 확인)
+    // 🚨 [추가] 역시간 입력 방지 로직
+    if (formData.startTime >= formData.endTime) {
+      return alert('🚨 시간 입력 오류: 도착 시간이 출발 시간보다 빠르거나 같을 수 없습니다.\n시간을 다시 확인해 주세요.');
+    }
+
     const { data: overlappingLogs, error: overlapError } = await supabase
       .from('logs')
       .select('*')
